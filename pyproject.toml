@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inverse-psalm"
+version = "0.1.0"
+description = "Annotation-conditioned FAESM masked infiller trained with a frozen PSALM verifier."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "accelerate>=1.2.0",
+  "biopython>=1.85",
+  "datasets>=3.2.0",
+  "faesm>=0.1.1",
+  "numpy>=1.26.0",
+  "pyyaml>=6.0.0",
+  "safetensors>=0.5.0",
+  "torch>=2.5.0",
+  "tqdm>=4.66.0",
+  "transformers>=4.48.0",
+  "wandb>=0.18.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

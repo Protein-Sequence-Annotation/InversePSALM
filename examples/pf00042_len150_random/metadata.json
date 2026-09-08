@@ -1,0 +1,38 @@
+{
+  "annotation_track": {
+    "background_mode": "none",
+    "domain_count": 1,
+    "residue_count": 150
+  },
+  "num_steps": 150,
+  "request": {
+    "aa_policy": "sample",
+    "background_mode": "none",
+    "canonical_only": true,
+    "checkpoint": "runs/psage-base/checkpoint-107000/generator",
+    "device": "cuda",
+    "domains": [
+      {
+        "pfam": "PF00042",
+        "start": 1,
+        "stop": 150
+      }
+    ],
+    "dtype": "bf16",
+    "ignore_label": -100,
+    "length": 150,
+    "masked_char": "?",
+    "masked_fill_aa": "A",
+    "max_aa_length": 4096,
+    "output_id": "pf00042_len150_random",
+    "position_policy": "margin",
+    "seed": 100,
+    "step_aa": 1,
+    "step_frac": null,
+    "temperature": 1.0,
+    "top_k": null,
+    "top_p": 0.95,
+    "use_fa": null
+  },
+  "step_size": 1
+}

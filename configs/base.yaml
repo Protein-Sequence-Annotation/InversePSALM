@@ -1,0 +1,215 @@
+model:
+  generator_model_name: "facebook/esm2_t33_650M_UR50D"
+  # Keep both true for the original InversePSALM training objective.
+  # annotation_loss=false skips PSALM verifier construction/forward/eval.
+  annotation_track: true
+  annotation_loss: false
+  verifier_model_name: "/n/eddy_lab/Lab/protein_annotation_dl/PSALM-github/models/PSALM-2-InterPro30-104.0"
+  psalm_repo_path: "/n/eddy_lab/Lab/protein_annotation_dl/PSALM-github"
+  # Each DDP rank only sees its own G PU as cuda:0; "cuda" places the verifier there (not pinned to physical GPU 0 across nodes).
+  verifier_device: "cuda"
+  max_position_embeddings: 4098
+  use_fa: true
+  generator_logits:
+    # Optional DSM-style soft cap on raw generator logits. Recommended trial for a fresh run: 30.0.
+    soft_cap: 30.0
+  # None + start/middle/stop for each of 24076 Pfam families.
+  annotation_vocab_size: 72229
+  annotation_dropout: 0.0
+  annotation_encoder:
+    type: "factorized"  # full_token or factorized
+    full_token:
+      embedding_dim: 640
+      mlp_dim: 1280
+      activation: "gelu"
+    factorized:
+      family_embedding_dim: 576
+      state_embedding_dim: 64
+      mlp_dim: 1280
+      activation: "gelu"
+  # 1-indexed ESM block injection spec; injection happens before selected blocks.
+  annotation_injection_blocks: "1-33"
+  annotation_gating:
+    init_gate: 0.005 #0.001
+    min_gate: 0.0
+    max_gate: 1.0
+    gate_l2: 0.0
+    normalize_delta: true
+  freeze_generator_trunk: false
+  freeze_lm_head: false
+  gradient_checkpointing: false
+  canonical_aa_only_for_verifier: true
+
+data:
+  max_aa_length: 4096
+  max_tokens_per_batch: 8192
+  chunk_size: 100000
+  default_shard_size: 25000
+  ignore_label: -100
+  seed: 100
+
+masking:
+  mask_token_replacement: "mask"
+  schedule:
+    type: "dsm_mixture"
+    branches:
+      # Main DSM random masking backbone.
+      - probability: 0.70
+        mask_type: "random"
+        min_rate: 0.01
+        max_rate: 1.0
+      # Extra high-mask random examples for early denoising / full generation.
+      - probability: 0.15
+        mask_type: "random"
+        min_rate: 0.70
+        max_rate: 1.0
+      # Extra low-mask random examples for late denoising / refinement.
+      - probability: 0.075
+        mask_type: "random"
+        min_rate: 0.01
+        max_rate: 0.30
+      # Auxiliary contiguous infilling, kept in low-to-mid mask regime.
+      - probability: 0.075
+        mask_type: "contiguous"
+        min_rate: 0.05
+        max_rate: 0.30
+loss:
+  mlm_weight: 1.0
+  verifier_weight:
+    value: 0.1
+    warmup_steps: 2000
+  verifier_mask_scale:
+    enabled: true
+    full_strength_until: 0.30
+    min_scale: 0.10
+  # Verifier input construction mode:
+  # - st_top1: forward uses hard top-1 tokens; backward keeps soft gradients.
+  # - soft: pure soft expected-embedding input.
+  verifier_input_mode: "soft"
+  # Temperature is used before verifier input construction.
+  verifier_temperature: 1.0
+  example_classes:
+    original:
+      mlm_loss: "all_residues"
+      annotation_loss: "domain_only"   # domain_only or all_residues
+      conditioning: "domain_only_or_unconditional"
+      unconditional_prob: 0.15
+    shuffled:
+      mlm_loss: "domain_only"
+      annotation_loss: "all_residues"
+      conditioning: "all_residues"
+    negative:
+      mlm_loss: "none"
+      annotation_loss: "all_residues"
+      conditioning: "all_residues"
+    domain_slice:
+      mlm_loss: "all_residues"
+      annotation_loss: "all_residues"
+      conditioning: "all_residues"
+
+training:
+  output_dir: "./runs/anno_input"
+  wandb_project: "InversePSALM"
+  evaluation_strategy: "steps"
+  eval_steps: 10700 #42515
+  save_steps: 10700
+  save_total_limit: 11
+  logging_steps: 1
+  max_steps: 107000 #425150
+  # Precomputed from logs/build_shards.out for current train shards:
+  # total_batches=3,401,140; world_size=4; grad_accum=2 => optimizer_steps_per_epoch=425,143.
+  # updated for grad_accum=8: 106286
+  optimizer_steps_per_epoch_estimate: 106286
+  schedule_steps: 107000 #425150
+  warmup_steps: 1000
+  gradient_accumulation_steps: 8
+  gradient_clipping: 1.0
+  mixed_precision: "bf16"
+  report_to: ["wandb"]
+  dataloader_num_workers: 4
+  dataloader_prefetch_factor: 4
+  dataloader_pin_memory: true
+  ignore_data_skip: true
+  # Use safetensors' module-aware save path so tied FAESM embedding/decoder weights are represented once.
+  save_safetensors: true
+  # Required with gradient checkpointing; DDP unused-parameter detection can mark checkpointed params ready twice.
+  ddp_find_unused_parameters: false
+  seed: 100
+  learning_rate:
+    annotation: 1e-4
+    # Optional faster LR for per-block annotation gate logits. Recommended trial: 5e-4 to 1e-3.
+    annotation_gate: 5e-4 #null
+    generator: 1e-5 # 5e-6
+    lm_head: 1e-5 # 5e-6
+  optimizer:
+    beta_1: 0.9
+    beta_2: 0.999
+    epsilon: 1.0e-8
+    weight_decay:
+      annotation: 0.0
+      annotation_gate: 0.0
+      generator: 0.01
+      lm_head: 0.0
+      default: 0.01
+    fused: null
+  lr_scheduler:
+    type: "cosine"
+    # After linear warmup, decay each LR group to this fraction of its peak LR.
+    min_lr_ratio: 0.1
+
+eval:
+  max_batches: 100
+  mlm_15_random:
+    enabled: true
+    classes: ["original", "domain_slice"]
+    seed: 1000
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.15
+      mask_type: "random"
+  mlm_50_random:
+    enabled: true
+    classes: ["original", "domain_slice"]
+    seed: 1100
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.50
+      mask_type: "random"
+  mlm_85_random:
+    enabled: true
+    classes: ["original", "domain_slice"]
+    seed: 1200
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.85
+      mask_type: "random"
+  anno_15_random:
+    enabled: true
+    classes: ["original", "shuffled", "negative", "domain_slice"]
+    seed: 3000
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.15
+      mask_type: "random"
+  anno_50_random:
+    enabled: true
+    classes: ["original", "shuffled", "negative", "domain_slice"]
+    seed: 3100
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.50
+      mask_type: "random"
+  anno_85_random:
+    enabled: true
+    classes: ["original", "shuffled", "negative", "domain_slice"]
+    seed: 3200
+    masking:
+      schedule:
+        type: "constant"
+        value: 0.85
+      mask_type: "random"

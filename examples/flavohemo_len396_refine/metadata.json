@@ -1,0 +1,60 @@
+{
+  "annotation_track": {
+    "background_mode": "ignore",
+    "domain_count": 3,
+    "residue_count": 396
+  },
+  "generation_steps": 396,
+  "num_steps": 416,
+  "refinement_steps": 20,
+  "request": {
+    "aa_policy": "min-p",
+    "background_mode": "ignore",
+    "canonical_only": true,
+    "checkpoint": "runs/psage-base/checkpoint-107000/generator",
+    "device": "cuda",
+    "domains": [
+      {
+        "pfam": "PF00042",
+        "start": 27,
+        "stop": 130
+      },
+      {
+        "pfam": "PF00970",
+        "start": 176,
+        "stop": 252
+      },
+      {
+        "pfam": "PF00175",
+        "start": 264,
+        "stop": 372
+      }
+    ],
+    "dtype": "bf16",
+    "ignore_label": -100,
+    "length": 396,
+    "masked_char": "?",
+    "masked_fill_aa": "A",
+    "max_aa_length": 4096,
+    "min_p": 0.05,
+    "output_id": "flavohemo_len396_refine",
+    "position_policy": "random",
+    "refine_aa_policy": "min-p",
+    "refine_min_p": 0.05,
+    "refine_position_policy": "confidence",
+    "refine_step_aa": 20,
+    "refine_step_frac": null,
+    "refine_steps": 20,
+    "refine_temperature": 1.0,
+    "refine_top_k": null,
+    "refine_top_p": 0.95,
+    "seed": 100,
+    "step_aa": 1,
+    "step_frac": null,
+    "temperature": 1.0,
+    "top_k": null,
+    "top_p": 0.95,
+    "use_fa": null
+  },
+  "step_size": 1
+}
